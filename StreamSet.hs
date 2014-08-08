@@ -11,22 +11,25 @@
 -- preserved).
 module StreamSet
     ( StreamSet
-    , empty, singleton, fromList, fromFiniteList, fromFiniteSet, toList
-    , insert, union, unions
-    , map --, unionMap
-    -- , fix
-    , null, member --, isSubsetOf
+    , null, member
+    , empty, singleton, insert
+    , fromList, fromUniqueList, fromFiniteList, fromFiniteSet, toList
+    , union, unions, filter, map, unionMap
+    , mapInjective, unionDisjoint, unionsDisjoint, unionMapDisjoint
+    , cartesianProduct, map2
+    -- , fix, isSubsetOf
+    , finiteFix
     )
 where
 
-import Prelude hiding (null, nub, map)
+import Prelude hiding (filter, map, nub, null)
 
 import Data.Set (Set)
 import Data.Maybe (mapMaybe)
 import qualified Data.List as List
 import qualified Data.Set as Set
 
-data StreamSet a = Lists { raw :: [a]    -- duplicates allowed
+data StreamSet a = Lists { raw :: [a]    -- finite # of duplicates allowed
                          , toList :: [a] -- no duplicates allowed
                          }
 
@@ -114,7 +117,7 @@ fromUniqueList :: Ord a => [a] -> StreamSet a
 fromUniqueList l = Lists l l
 
 fromFiniteSet :: Ord a => Set a -> StreamSet a
-fromFiniteSet s = Lists (Set.toList s) (Set.toList s)
+fromFiniteSet s = fromUniqueList (Set.toList s)
 
 fromFiniteList :: Ord a => [a] -> StreamSet a
 fromFiniteList = fromFiniteSet . Set.fromList
@@ -136,6 +139,9 @@ unionDisjoint (Lists araw alist) b
 
 unions :: Ord a => [StreamSet a] -> StreamSet a
 unions [] = empty
+-- TODO: think about whether this can produce a list with infinitely many
+-- duplicates in its `raw`
+--
 -- we use raw to avoid having lots of intermediate nubbing Sets lying around
 unions sets = fromList $ interleaves [raw s | s <- sets]
 
