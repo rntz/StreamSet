@@ -93,10 +93,20 @@ union a b | null a = b
 -- we use raw to avoid having lots of intermediate nubbing Sets lying around
 union a b = fromList $ interleave (raw a) (raw b)
 
+-- the sets you provide must be disjoint!
+unionDisjoint :: Ord a => StreamSet a -> StreamSet a -> StreamSet a
+unionDisjoint (Lists araw anodups) (Lists braw bnodups)
+    = Lists (interleave araw braw) (interleave anodups bnodups)
+
 -- TODO: think about the order of the enumeration I'm doing here!
 unions :: Ord a => [StreamSet a] -> StreamSet a
 unions [] = empty
 unions xs = foldr1 union xs
+
+-- the sets you provide must be disjoint!
+unionsDisjoint :: Ord a => [StreamSet a] -> StreamSet a
+unionsDisjoint [] = empty
+unionsDisjoint xs = foldr1 unionDisjoint xs
 
 filter :: Ord a => (a -> Bool) -> StreamSet a -> StreamSet a
 filter p (Lists raw nodups) = Lists (List.filter p raw) (List.filter p nodups)
@@ -110,11 +120,19 @@ map2 f as bs = map (uncurry f) (cartesianProduct as bs)
 unionMap :: (Ord b) => (a -> StreamSet b) -> StreamSet a -> StreamSet b
 unionMap f s = unions $ List.map f $ toList s
 
+-- the function you provide must be injective!
+mapInjective :: Ord b => (a -> b) -> StreamSet a -> StreamSet b
+mapInjective f (Lists raw nodups) = Lists (List.map f raw) (List.map f nodups)
+
+-- the function you give must map distinct values to disjoint sets!
+unionMapDisjoint :: Ord b => (a -> StreamSet b) -> StreamSet a -> StreamSet b
+unionMapDisjoint f s = unionsDisjoint $ List.map f $ toList s
+
 
 -- Some set operations
 -- TODO: think about enumeration order!
 cartesianProduct :: (Ord a, Ord b) => StreamSet a -> StreamSet b -> StreamSet (a,b)
-cartesianProduct as bs = unionMap (\x -> map (\y -> (x,y)) bs) as
+cartesianProduct as bs = unionMapDisjoint (\x -> map (\y -> (x,y)) bs) as
 
 
 -- the function had better be monotonic!
