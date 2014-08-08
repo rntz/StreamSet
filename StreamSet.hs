@@ -114,7 +114,8 @@ filter p (Lists raw nodups) = Lists (List.filter p raw) (List.filter p nodups)
 map :: (Ord b) => (a -> b) -> StreamSet a -> StreamSet b
 map f s = fromList $ List.map f $ raw s
 
-map2 :: (Ord a, Ord b, Ord c) => (a -> b -> c) -> StreamSet a -> StreamSet b -> StreamSet c
+map2 :: (Ord a, Ord b, Ord c) =>
+        (a -> b -> c) -> StreamSet a -> StreamSet b -> StreamSet c
 map2 f as bs = map (uncurry f) (cartesianProduct as bs)
 
 unionMap :: (Ord b) => (a -> StreamSet b) -> StreamSet a -> StreamSet b
@@ -131,7 +132,8 @@ unionMapDisjoint f s = unionsDisjoint $ List.map f $ toList s
 
 -- Some set operations
 -- TODO: think about enumeration order!
-cartesianProduct :: (Ord a, Ord b) => StreamSet a -> StreamSet b -> StreamSet (a,b)
+cartesianProduct :: (Ord a, Ord b) =>
+                    StreamSet a -> StreamSet b -> StreamSet (a,b)
 cartesianProduct as bs = unionMapDisjoint (\x -> map (\y -> (x,y)) bs) as
 
 
