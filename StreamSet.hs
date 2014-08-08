@@ -53,10 +53,36 @@ dedup _ [] = []
 finiteNub :: Ord a => [a] -> [a]
 finiteNub = Set.toList . Set.fromList
 
+getHead :: [a] -> Maybe (a,[a])
+getHead (a:as) = Just (a,as)
+getHead [] = Nothing
+
 -- lazy in its second argument, at least until it destructs its first
 interleave :: [a] -> [a] -> [a]
 interleave (a:as) bs = a : interleave bs as
 interleave [] bs = bs
+
+-- does the classic "triangular" enumeration of (N x N) where N is the naturals,
+-- generalized to a (possibly) infinite list of (possibly) infinite lists.
+--
+-- for reference, the "triangular" enumeration of N x N is:
+--     [(0,0),
+--      (1,0), (0,1),
+--      (2,0), (1,1), (0,2),
+--      (3,0), (2,1), (1,2), (0,3),
+--      ...]
+--
+-- TODO?: generalize to n dimensions?
+cross :: [a] -> [b] -> [(a,b)]
+cross xs ys = interleaves [[(x,y) | y <- ys] | x <- xs]
+
+interleaves :: [[a]] -> [a]
+interleaves [] = []
+interleaves (l:ls) = taker [l] ls
+    where taker l ls =
+              let (as, l') = unzip $ mapMaybe getHead l
+              in as ++ case ls of [] -> taker l' []
+                                  (l:ls) -> taker (l:l') ls
 
 
 -- Queries
@@ -84,30 +110,37 @@ insert x (Lists raw elems) = Lists (x:raw) (x : List.filter (/= x) elems)
 fromList :: Ord a => [a] -> StreamSet a
 fromList l = Lists l (nub l)
 
+fromUniqueList :: Ord a => [a] -> StreamSet a
+fromUniqueList l = Lists l l
+
 fromFiniteSet :: Ord a => Set a -> StreamSet a
 fromFiniteSet s = Lists (Set.toList s) (Set.toList s)
 
 fromFiniteList :: Ord a => [a] -> StreamSet a
 fromFiniteList = fromFiniteSet . Set.fromList
 
--- pulls on its left argument before it pulls on its right.
--- this detail can be important for constructing e.g. infinite unions.
+-- pulls an element off of its left argument before it forces its right to WHNF.
+-- this property is important for constructing e.g. infinite unions.
 union :: Ord a => StreamSet a -> StreamSet a -> StreamSet a
 union a b | null a = b
 -- we use raw to avoid having lots of intermediate nubbing Sets lying around
 union a b = fromList $ interleave (raw a) (raw b)
 
 -- the sets you provide must be disjoint!
+-- like union, lazy in its second argument.
 unionDisjoint :: Ord a => StreamSet a -> StreamSet a -> StreamSet a
-unionDisjoint (Lists araw anodups) (Lists braw bnodups)
-    = Lists (interleave araw braw) (interleave anodups bnodups)
+unionDisjoint a b | null a = b
+-- note that we carefully avoid destructing b
+unionDisjoint (Lists araw alist) b
+    = Lists (interleave araw (raw b)) (interleave alist (toList b))
 
--- TODO: think about the order of the enumeration I'm doing here!
 unions :: Ord a => [StreamSet a] -> StreamSet a
 unions [] = empty
-unions xs = foldr1 union xs
+-- we use raw to avoid having lots of intermediate nubbing Sets lying around
+unions sets = fromList $ interleaves [raw s | s <- sets]
 
 -- the sets you provide must be disjoint!
+-- TODO: consider order of enumeration
 unionsDisjoint :: Ord a => [StreamSet a] -> StreamSet a
 unionsDisjoint [] = empty
 unionsDisjoint xs = foldr1 unionDisjoint xs
@@ -118,16 +151,12 @@ filter p (Lists raw nodups) = Lists (List.filter p raw) (List.filter p nodups)
 map :: (Ord b) => (a -> b) -> StreamSet a -> StreamSet b
 map f s = fromList $ List.map f $ raw s
 
-map2 :: (Ord a, Ord b, Ord c) =>
-        (a -> b -> c) -> StreamSet a -> StreamSet b -> StreamSet c
-map2 f as bs = map (uncurry f) (cartesianProduct as bs)
-
-unionMap :: (Ord b) => (a -> StreamSet b) -> StreamSet a -> StreamSet b
-unionMap f s = unions $ List.map f $ toList s
-
 -- the function you provide must be injective!
 mapInjective :: Ord b => (a -> b) -> StreamSet a -> StreamSet b
 mapInjective f (Lists raw nodups) = Lists (List.map f raw) (List.map f nodups)
+
+unionMap :: (Ord b) => (a -> StreamSet b) -> StreamSet a -> StreamSet b
+unionMap f s = unions $ List.map f $ toList s
 
 -- the function you give must map distinct values to disjoint sets!
 unionMapDisjoint :: Ord b => (a -> StreamSet b) -> StreamSet a -> StreamSet b
@@ -138,7 +167,12 @@ unionMapDisjoint f s = unionsDisjoint $ List.map f $ toList s
 -- TODO: think about enumeration order!
 cartesianProduct :: (Ord a, Ord b) =>
                     StreamSet a -> StreamSet b -> StreamSet (a,b)
-cartesianProduct as bs = unionMapDisjoint (\x -> map (\y -> (x,y)) bs) as
+cartesianProduct as bs = Lists (cross (raw as) (raw bs))
+                               (cross (toList as) (toList bs))
+
+map2 :: (Ord a, Ord b, Ord c) =>
+        (a -> b -> c) -> StreamSet a -> StreamSet b -> StreamSet c
+map2 f as bs = map (uncurry f) (cartesianProduct as bs)
 
 
 -- the function had better be monotonic!
