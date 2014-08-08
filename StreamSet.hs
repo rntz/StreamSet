@@ -1,10 +1,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- A (potentially infinite) set which is lazy in its keys.
+-- A (potentially infinite) set, which can be lazily converted to a list without
+-- forcing all of its keys at once (unlike Data.Set, which cannot be infinite
+-- and forces all of its keys).
+--
 -- TODO: runtime analysis
 --
--- it may help to think of this as "a stream without duplicates", except that
--- some operations don't preserve order (enumerability, however, is preserved).
+-- It may help to think of this as "a stream without duplicates", except that
+-- operations aren't required to preserve order (enumerability, however, must be
+-- preserved).
 module StreamSet
     ( StreamSet
     , empty, singleton, fromList, fromFiniteList, fromFiniteSet, toList
