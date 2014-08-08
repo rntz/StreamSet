@@ -168,7 +168,7 @@ isSubsetOf a b = all (`member` b) (toList a)
 --               | otherwise = 3 * n + 1
 --
 -- This computes all numbers touched by the collatz sequences of numbers in the
--- given initial set; and it mavoids recomputation of the trailing sequences of
+-- given initial set; and it avoids recomputation of the trailing sequences of
 -- any numbers already visited (i.e. it "memoizes").
 finiteFix :: forall a. Ord a => (a -> Set a) -> Set a -> StreamSet a
 finiteFix expand init = iter init init
